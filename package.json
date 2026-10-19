@@ -1,0 +1,32 @@
+{
+  "name": "wildwatch-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || >=22.0.0"
+  },
+  "overrides": {
+    "rollup": "4.60.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "node --import tsx --test src/types.test.ts src/simulator.test.ts src/export.test.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.9",
+    "@types/node": "^18.19.0",
+    "@vitejs/plugin-react": "4.4.1",
+    "typescript": "~5.8.3",
+    "tsx": "^4.23.15",
+    "vite": "^6.4.4"
+  }
+}
