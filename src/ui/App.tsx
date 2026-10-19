@@ -3,10 +3,11 @@ import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, BellRing, Ca
 import { DATA_MODE_LABEL, isDemoMode, loadAllDetections, loadDetection, loadDetections, loadSummary } from '../backend';
 import { downloadDetectionsCsv } from '../export';
 import DemoFeatures from './DemoFeatures';
+import SystemStatus from './SystemStatus';
 import type { SimulatedDetection } from '../simulator';
 import { EMPTY_FILTERS, type Detection, type DetectionFilters } from '../types';
 
-type View = 'overview' | 'history';
+type View = 'overview' | 'history' | 'status';
 const PAGE_SIZE = 7;
 const NA = 'Not available';
 const localTime = (date: string | null) => date ? new Date(date).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : NA;
@@ -25,8 +26,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
-  const [simulated, setSimulated] = useState<SimulatedDetection[]>([]);
-  const [resetToken, setResetToken] = useState(0);
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -70,6 +69,7 @@ function App() {
       <div className="nav-label">WORKSPACE</div>
       <button className={`nav-item ${view === 'overview' ? 'active' : ''}`} onClick={() => { setView('overview'); setMobileNav(false); }}><Activity size={17} />Overview</button>
       <button className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => { setView('history'); setMobileNav(false); }}><Clock3 size={17} />Detection history</button>
+      <button className={`nav-item ${view === 'status' ? 'active' : ''}`} onClick={() => { setView('status'); setMobileNav(false); }}><Database size={17} />System status</button>
       <div className="sidebar-divider" />
       <div className="nav-label">SYSTEM</div>
       <div className="system-card"><div className="system-icon"><Database size={16} /></div><div><b>{isDemoMode ? 'Demo environment' : loading ? 'Checking database' : error ? 'Database unavailable' : 'Database connected'}</b><span>{isDemoMode ? 'Sample detections only' : 'Supabase data source'}</span></div><span className={`status-dot ${isDemoMode || error ? 'demo-dot' : ''}`} /></div>
@@ -77,7 +77,7 @@ function App() {
     </aside>
     {mobileNav && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <main className="main-area">
-      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : 'Detection history'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span><div className="top-avatar">FT</div></div></header>
+      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : view === 'history' ? 'Detection history' : 'System status'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span><div className="top-avatar">FT</div></div></header>
       <div className="content">
         {view === 'overview' ? <>
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />WILDLIFE CROSSING MONITOR</div><h1>Good afternoon, team <span>✳</span></h1><p>A clear look at activity around your monitored crossings.</p></div><button className="button button-secondary" onClick={() => { setView('history'); setFilters(EMPTY_FILTERS); }}><ListFilter size={16} />View all detections<ArrowRight size={15} /></button></div>
@@ -89,12 +89,9 @@ function App() {
             <StatCard label="Most detected" value={loading ? '—' : mostCommon} caption={summary.length ? `${animalCounts[mostCommon] ?? 0} recorded detections` : 'No records yet'} icon={<Compass size={17} />} tone="amber" small />
             <StatCard label="Warnings triggered" value={loading ? '—' : String(warningCount)} caption="Records marked as warned" icon={<BellRing size={17} />} tone="rose" />
           </section>
-          <DemoFeatures records={summary} simulated={simulated} onSimulatedChange={setSimulated} onSelect={showDetails} resetToken={resetToken} onReset={() => setResetToken((value) => value + 1)} databaseLoading={loading} databaseError={Boolean(error)} demoMode={isDemoMode} lastRefresh={lastRefresh} />
-          <section className="panel table-panel"><PanelHeading title="Recent detections" subtitle="Latest records from monitored crossings" icon={<Clock3 size={16} />} aside={<button className="text-link" onClick={() => setView('history')}>View history <ArrowRight size={14} /></button>} />
-            <DetectionTable records={summary.slice(0, 5)} loading={loading} onSelect={showDetails} compact onHistory={() => setView('history')} />
-          </section>
+          <DemoFeatures records={summary} />
           <footer className="page-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo mode · no live camera connection' : 'Connected to your Supabase database'}</span><span>WildWatch <i>·</i> Crossing safety dashboard</span></footer>
-        </> : <>
+        </> : view === 'history' ? <>
           <div className="page-heading history-heading"><div><div className="eyebrow"><span className="eyebrow-line" />RECORDS</div><h1>Detection history</h1><p>Search and review detections captured across your monitored sites.</p></div><button className="button button-secondary" onClick={() => void refresh()}><RefreshCw size={15} />Refresh records</button></div>
           {isDemoMode && <div className="demo-banner compact-banner"><div className="demo-banner-icon"><CircleHelp size={17} /></div><div><b>Sample data preview</b><span>Showing fictional demo detections. Configure Supabase to use shared database records.</span></div><span className="demo-banner-tag">DEMO ONLY</span></div>}
           {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
@@ -105,6 +102,11 @@ function App() {
             <div className="pagination"><span>Showing <b>{total ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, total)}</b> of <b>{total}</b> records</span><div><button aria-label="Previous page" disabled={page <= 1 || loading} onClick={() => setPage((n) => Math.max(1, n - 1))}><ArrowLeft size={15} /></button><span>Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span><button aria-label="Next page" disabled={page * PAGE_SIZE >= total || loading} onClick={() => setPage((n) => n + 1)}><ArrowRight size={15} /></button></div></div>
           </section>
           <footer className="page-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo mode · no live camera connection' : 'Connected to your Supabase database'}</span><span>WildWatch <i>·</i> Crossing safety dashboard</span></footer>
+        </> : <>
+          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />SYSTEM</div><h1>System status</h1><p>Review database connectivity and the current preview pipeline state.</p></div><button className="button button-secondary" onClick={() => void refresh()}><RefreshCw size={15} />Refresh status</button></div>
+          {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+          <SystemStatus databaseLoading={loading} databaseError={Boolean(error)} demoMode={isDemoMode} lastRefresh={lastRefresh} />
+          <footer className="page-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo mode · camera and AI are preview only' : 'Supabase connection status'}</span><span>WildWatch <i>·</i> System status</span></footer>
         </>}
       </div>
     </main>

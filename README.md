@@ -25,15 +25,15 @@ npm run preview
 
 ## Interactive demo features
 
-Open **Overview → Crossing risk simulator** to use the demo controls. Choose an animal, set its distance to the sample road, choose whether it is moving toward the road, and click **Simulate detection**. The risk indicator is based on distance and movement: high at 10 m or closer while approaching, medium within 30 m while approaching (or within 10 m while stationary), and low otherwise. The virtual warning light turns red only for high simulated risk; amber indicates medium risk. It is a visual simulation and does not control a real warning light.
+The Overview page is a static product preview with fictional wildlife examples. The high-risk indicator and virtual warning state represent the sample camera's 7:30 PM deer detection. System status is available in its own sidebar tab. There is no interactive wildlife simulator in this version. The preview does not control a real warning light, connect to a camera, or run an AI model.
 
-Use a scenario preset for a deer approaching the road, multiple animals, nighttime detection, or no wildlife. The schematic map plots simulated positions along a sample road and is not a live map or GPS display. The analytics show the saved data source and local simulated events as separate series. Simulated events are held in browser memory only: they are not written to Supabase, added to detection history, or included in CSV exports.
+The camera preview is a static presentation mock showing three fictional animals at 7:30 PM with example confidence and risk labels. It is not a live camera feed or GPS display. Dashboard analytics use the selected sample or Supabase records.
 
-Click a simulated detection to view its placeholder image, classification, confidence, timestamp, simulated risk, distance, and movement. **Reset demo** clears simulator events and resets risk, warning-light, selected movement, and scenario state. The original sample data and any Supabase records are untouched.
+The recent detections table and detection history remain available for reviewing records. The camera snapshot examples are illustrative and are not stored in Supabase.
 
-The System status panel reports the configured database connection and last successful data refresh. Camera and AI entries always say **simulated** because this project does not connect to a camera or run an AI model. In demo mode, the database status explicitly says it is displaying demo records.
+The System status tab reports the configured database connection and last successful data refresh. Camera and AI entries always say **preview only** because this project does not connect to a camera or run an AI model. In demo mode, the database status explicitly says it is displaying demo records.
 
-In Detection history, **Export CSV** downloads every record matching the current search and filters (not only the visible page). In database mode, matching records are loaded from Supabase in pages before export. Demo records can also be exported; simulated events are intentionally kept separate.
+In Detection history, **Export CSV** downloads every record matching the current search and filters (not only the visible page). In database mode, matching records are loaded from Supabase in pages before export. Demo records can also be exported.
 
 ## Shared database setup (Supabase)
 
@@ -66,9 +66,10 @@ The source repository currently has no initial commit and its configured `origin
 
 - `src/ui/` — dashboard, responsive styling, history filters, and record detail view
 - `src/backend.ts` — demo/data-source switch and Supabase queries
-- `src/simulator.ts` — simulated risk rules, detections, and scenario presets
+- `src/simulator.ts` — risk and scenario domain helpers retained for future integration
 - `src/export.ts` — filtered CSV report formatting and download
-- `src/ui/DemoFeatures.tsx` — simulator controls, virtual light, status, map, and demo analytics
+- `src/ui/DemoFeatures.tsx` — static product preview, virtual light, camera mock, and analytics
+- `src/ui/SystemStatus.tsx` — database and preview pipeline status tab
 - `src/types.ts` — detection schema, validation, and demo filtering
 - `src/data.ts` — clearly labeled local fictional sample records
 - `supabase/migrations/` — database schema and read policy
