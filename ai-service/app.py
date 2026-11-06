@@ -147,9 +147,15 @@ def analyze_video_file(path: str) -> dict:
 
 
 app = FastAPI(title="WildWatch local inference", version="0.1.0")
+allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+allowed_origins.extend(
+    origin.strip()
+    for origin in os.getenv("WILDLIFE_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=allowed_origins,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=False,
     allow_methods=["GET", "POST"],

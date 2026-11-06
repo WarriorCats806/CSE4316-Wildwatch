@@ -67,16 +67,19 @@ In Detection history, **Export CSV** downloads every record matching the current
 
 The table uses UTC `timestamptz`, nullable animal class, confidence, location, warning details, image reference, notes, and status. Confidence must be between 0 and 1. Authenticated users have read-only access; anonymous users cannot read the table. For the future detection pipeline, send records through a trusted server or Supabase Edge Function. Keep any service-role key server-side; never expose it in this frontend. The dashboard does not upload or store image files.
 
-## Publish with Vercel and GitHub
+## Publish with AWS Amplify and GitHub
 
-This stack keeps publishing simple: use the group’s GitHub repository as the source and Vercel for the static frontend.
+Amplify Hosting serves the Vite frontend from the group's GitHub repository. The checked-in [`amplify.yml`](amplify.yml) builds `dist`; Amplify rebuilds the site when changes reach the connected branch.
 
-1. Push this project to the group’s GitHub repository and have teammates work in branches and open pull requests.
-2. In Vercel, import the GitHub repository. Keep the detected Vite defaults (`npm run build`, output directory `dist`).
-3. In Vercel project settings, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for Preview and Production, then redeploy.
-4. Share the Vercel project with teammates who need deploy access. Preview deployments can be used to review pull requests.
+1. In AWS Amplify, choose **Deploy an app → GitHub**, then connect `WarriorCats806/CSE4316-Wildwatch` and the `main` branch. Authorize the AWS Amplify GitHub App for this repository only.
+2. Keep the detected build settings (`npm ci`, `npm run build`, output directory `dist`).
+3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` under the Amplify app's environment variables and redeploy. These are public browser settings; never put a Supabase service-role key in the frontend.
+4. After Amplify creates the HTTPS domain, add it to Supabase **Authentication → URL Configuration** as the Site URL and an allowed redirect URL. Use **Authentication → Users** to invite the team.
+5. Share the Amplify app with teammates who need deploy access. GitHub branches can provide separate preview deployments.
 
-The repository's `origin` is `https://github.com/WarriorCats806/CSE4316-Wildwatch.git`. GitHub and Vercel access must be granted to any teammate who needs to push code or manage deployments.
+The hosted site is the dashboard only. NanoDetector still runs on a team member's computer; each person who wants AI image/video analysis must start the local Python service. To allow the hosted page to call that local service, set `WILDLIFE_ALLOWED_ORIGINS` in its `.env` to the exact Amplify HTTPS domain. The model API and Raspberry Pi hardware are not deployed by Amplify.
+
+Amplify charges for usage outside the applicable free tier (including build minutes, stored assets, and data transfer). Check the account's current Free Tier and billing before leaving the app deployed. The repository's origin is `https://github.com/WarriorCats806/CSE4316-Wildwatch.git`.
 
 ## Project structure
 
@@ -89,6 +92,7 @@ The repository's `origin` is `https://github.com/WarriorCats806/CSE4316-Wildwatc
 - `src/ui/DemoFeatures.tsx` — static product preview, virtual light, camera mock, and analytics
 - `src/ui/AIAnalysis.tsx` — local image upload and NanoDetector results view
 - `ai-service/app.py` — model adapter and local Python inference API
+- `amplify.yml` — AWS Amplify Hosting build settings
 - `src/ui/SystemStatus.tsx` — database and preview pipeline status tab
 - `src/types.ts` — detection schema, validation, and demo filtering
 - `src/data.ts` — clearly labeled local fictional sample records
