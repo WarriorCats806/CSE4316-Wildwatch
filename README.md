@@ -1,6 +1,6 @@
 # WildWatch Dashboard
 
-A shared wildlife crossing dashboard for the Team 11 project. The frontend is a React and TypeScript app, demo data is local and fictional, and shared records can be read from Supabase. An optional local Python service runs NanoDetector on uploaded test images. There is no live camera driver, warning-light control, authentication flow, or continuous monitoring.
+A shared wildlife crossing dashboard for the Team 11 project. The frontend is a React and TypeScript app, demo data is local and fictional, and authenticated team members can read shared records from Supabase. An optional local Python service runs NanoDetector on uploaded test images. There is no live camera driver, warning-light control, or continuous monitoring.
 
 ## Quick start
 
@@ -52,7 +52,7 @@ In Detection history, **Export CSV** downloads every record matching the current
 ## Shared database setup (Supabase)
 
 1. One teammate creates a Supabase project and invites the rest of the group through the Supabase project access controls.
-2. In the Supabase SQL Editor, run [`supabase/migrations/202610180001_create_detections.sql`](supabase/migrations/202610180001_create_detections.sql). It creates the nullable detection fields, confidence validation, indexes, and read-only row-level security policy.
+2. In the Supabase SQL Editor, run the migrations in timestamp order: [`202610180001_create_detections.sql`](supabase/migrations/202610180001_create_detections.sql), then [`202611060001_require_authenticated_detections.sql`](supabase/migrations/202611060001_require_authenticated_detections.sql). The first creates the table and indexes; the second restricts reads to signed-in users. Both leave database writes disabled from the browser.
 3. In **Project Settings → API**, copy the project URL and the public anon/publishable key.
 4. Copy `.env.example` to `.env.local` and fill in the two values:
 
@@ -62,9 +62,10 @@ In Detection history, **Export CSV** downloads every record matching the current
    ```
 
 5. Optional: in the SQL Editor, run [`supabase/seed.sql`](supabase/seed.sql) to add seven clearly labeled fictional presentation records. The seed can be rerun safely and skips rows already inserted by ID.
-6. Restart `npm run dev`. The app will show **DATABASE** mode. Add approved records using the Supabase Table Editor. The dashboard is read-only and the migration grants public read access, so do not put private data or secrets in these rows. Seed rows are fictional; keep them clearly labeled or omit the seed for a production database.
+6. In **Authentication → Sign In / Providers**, enable Email. In **Authentication → Users**, create or invite an account for each teammate. Teammates sign in with those credentials in WildWatch; account creation is managed from Supabase rather than the public app.
+7. Restart `npm run dev`. The app requires sign-in in **DATABASE** mode. In **DEMO DATA** mode (when Supabase environment values are blank), the fictional preview remains open without an account. Add approved detection records using the Supabase Table Editor. Seed rows are fictional; keep them clearly labeled or omit the seed for a production database.
 
-The table uses UTC `timestamptz`, nullable animal class, confidence, location, warning details, image reference, notes, and status. Confidence must be between 0 and 1. For the future detection pipeline, send records through a trusted server or Supabase Edge Function. Keep any service-role key server-side; never expose it in this frontend. The dashboard does not upload or store image files.
+The table uses UTC `timestamptz`, nullable animal class, confidence, location, warning details, image reference, notes, and status. Confidence must be between 0 and 1. Authenticated users have read-only access; anonymous users cannot read the table. For the future detection pipeline, send records through a trusted server or Supabase Edge Function. Keep any service-role key server-side; never expose it in this frontend. The dashboard does not upload or store image files.
 
 ## Publish with Vercel and GitHub
 
@@ -81,6 +82,8 @@ The repository's `origin` is `https://github.com/WarriorCats806/CSE4316-Wildwatc
 
 - `src/ui/` — dashboard, responsive styling, history filters, and record detail view
 - `src/backend.ts` — demo/data-source switch and Supabase queries
+- `src/auth.ts` — Supabase email/password session and token refresh
+- `src/ui/Login.tsx` — team sign-in screen
 - `src/simulator.ts` — risk and scenario domain helpers retained for future integration
 - `src/export.ts` — filtered CSV report formatting and download
 - `src/ui/DemoFeatures.tsx` — static product preview, virtual light, camera mock, and analytics

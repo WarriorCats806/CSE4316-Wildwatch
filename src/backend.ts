@@ -1,4 +1,5 @@
 import type { Detection, DetectionFilters } from './types';
+import { getAccessToken } from './auth';
 import { DEMO_DETECTIONS } from './data';
 import { filterDetections, isValidDetection } from './types';
 
@@ -14,8 +15,10 @@ function apiUrl(params: URLSearchParams): string {
 }
 
 async function readRows(params: URLSearchParams, count = false): Promise<{ rows: Detection[]; total: number }> {
+  const accessToken = getAccessToken();
+  if (!accessToken) throw new Error('Sign in to access shared detections.');
   const response = await fetch(apiUrl(params), {
-    headers: { apikey: anonKey!, Authorization: `Bearer ${anonKey}`, ...(count ? { Prefer: 'count=exact' } : {}) },
+    headers: { apikey: anonKey!, Authorization: `Bearer ${accessToken}`, ...(count ? { Prefer: 'count=exact' } : {}) },
   });
   if (!response.ok) {
     let detail = response.statusText;

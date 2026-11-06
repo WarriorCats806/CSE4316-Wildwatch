@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, BellRing, BrainCircuit, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Compass, Database, Download, Eye, Filter, Leaf, ListFilter, MapPin, Menu, MoreHorizontal, Search, ShieldCheck, SlidersHorizontal, X, RefreshCw } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, BellRing, BrainCircuit, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Compass, Database, Download, Eye, Filter, Leaf, ListFilter, LogOut, MapPin, Menu, MoreHorizontal, Search, ShieldCheck, SlidersHorizontal, X, RefreshCw } from 'lucide-react';
+import { readAuthSession, restoreAuthSession, signOut, type AuthSession } from '../auth';
 import { DATA_MODE_LABEL, isDemoMode, loadAllDetections, loadDetection, loadDetections, loadSummary } from '../backend';
 import { downloadDetectionsCsv } from '../export';
 import DemoFeatures from './DemoFeatures';
 import SystemStatus from './SystemStatus';
 import AIAnalysis from './AIAnalysis';
+import Login from './Login';
 import type { SimulatedDetection } from '../simulator';
 import { EMPTY_FILTERS, type Detection, type DetectionFilters } from '../types';
 
@@ -29,8 +31,27 @@ function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(() => isDemoMode ? null : readAuthSession());
+  const [authLoading, setAuthLoading] = useState(!isDemoMode);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  useEffect(() => {
+    if (isDemoMode) return;
+    let active = true;
+    void restoreAuthSession().then((session) => { if (active) setAuthSession(session); }).finally(() => { if (active) setAuthLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (isDemoMode || !authSession) return;
+    const timer = window.setInterval(() => {
+      void restoreAuthSession().then(setAuthSession);
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [authSession?.refresh_token]);
 
   const refresh = useCallback(async () => {
+    if (!isDemoMode && !authSession) { setLoading(false); return; }
     setLoading(true); setError('');
     try {
       const [result, all] = await Promise.all([loadDetections(filters, page, PAGE_SIZE), loadSummary()]);
@@ -38,7 +59,7 @@ function App() {
       setLastRefresh(new Date().toISOString());
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Something went wrong while loading detections.'); }
     finally { setLoading(false); }
-  }, [filters, page]);
+  }, [filters, page, authSession]);
 
   useEffect(() => { void refresh(); }, [refresh]);
   const species = useMemo(() => [...new Set(summary.map((item) => item.animal_class).filter((item): item is string => Boolean(item)))].sort(), [summary]);
@@ -64,6 +85,11 @@ function App() {
     finally { setExporting(false); }
   };
 
+  if (!isDemoMode && authLoading) return <main className="auth-page"><div className="auth-loading"><span className="spinner" />Checking your session…</div></main>;
+  if (!isDemoMode && !authSession) return <Login onAuthenticated={setAuthSession} />;
+
+  const handleSignOut = () => { void signOut().catch(() => undefined).finally(() => setAuthSession(null)); };
+
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><Leaf size={20} /></div><div><strong>WildWatch</strong><span>FIELD OPERATIONS</span></div><button className="mobile-close icon-button" onClick={() => setMobileNav(false)} aria-label="Close menu"><X size={18} /></button></div>
@@ -75,11 +101,11 @@ function App() {
       <div className="sidebar-divider" />
       <div className="nav-label">SYSTEM</div>
       <div className="system-card"><div className="system-icon"><Database size={16} /></div><div><b>{isDemoMode ? 'Demo environment' : loading ? 'Checking database' : error ? 'Database unavailable' : 'Database connected'}</b><span>{isDemoMode ? 'Sample detections only' : 'Supabase data source'}</span></div><span className={`status-dot ${isDemoMode || error ? 'demo-dot' : ''}`} /></div>
-      <div className="sidebar-bottom"><div className="help-row"><CircleHelp size={16} /><span>About this dashboard</span></div><div className="profile"><div className="avatar">WW</div><div><b>Field team</b><span>Wildlife monitoring</span></div><MoreHorizontal size={18} className="profile-more" /></div></div>
+      <div className="sidebar-bottom"><button className="help-row" onClick={() => { setAboutOpen(true); setMobileNav(false); }}><CircleHelp size={16} /><span>About this dashboard</span></button><div className="profile"><div className="avatar">WW</div><div><b>{authSession?.user.email ?? 'Field team'}</b><span>Wildlife monitoring</span></div><MoreHorizontal size={18} className="profile-more" /></div></div>
     </aside>
     {mobileNav && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <main className="main-area">
-      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : view === 'history' ? 'Detection history' : view === 'ai' ? 'AI analysis' : 'System status'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span><div className="top-avatar">FT</div></div></header>
+      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : view === 'history' ? 'Detection history' : view === 'ai' ? 'AI analysis' : 'System status'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>{authSession && <button className="auth-signout" onClick={handleSignOut}><LogOut size={14} /><span>Sign out</span></button>}<div className="top-avatar">{authSession?.user.email?.slice(0, 1).toUpperCase() ?? 'FT'}</div></div></header>
       <div className="content">
         {view === 'overview' ? <>
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />WILDLIFE CROSSING MONITOR</div><h1>Good afternoon, team <span>✳</span></h1><p>A clear look at activity around your monitored crossings.</p></div><button className="button button-secondary" onClick={() => { setView('history'); setFilters(EMPTY_FILTERS); }}><ListFilter size={16} />View all detections<ArrowRight size={15} /></button></div>
@@ -112,7 +138,8 @@ function App() {
         </> : <AIAnalysis />}
       </div>
     </main>
-    {selected && <div className="modal-scrim" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" onClick={(e) => e.stopPropagation()}><div className="detail-header"><div><div className="eyebrow"><span className="eyebrow-line" />{'simulation' in selected ? 'SIMULATED DEMO RECORD' : 'DETECTION RECORD'}</div><h2 id="detail-title">{selected.animal_class ?? NA}</h2><span className="detail-id">{selected.id}</span></div><button className="icon-button" aria-label="Close details" onClick={() => setSelected(null)}><X size={18} /></button></div>{detailLoading ? <div className="detail-loading"><span className="spinner" />Loading record…</div> : <><div className="detail-image">{selected.image_url ? <img src={selected.image_url} alt="Detection reference" /> : <div><div className="image-placeholder-icon"><Eye size={21} /></div><strong>{'simulation' in selected ? 'Simulated image placeholder' : 'Image not attached'}</strong><span>Visual reference for this record is {NA.toLowerCase()}.</span></div>}<span className="image-tag">{selected.image_url ? 'RECORD IMAGE' : 'NO MEDIA'}</span></div><div className="detail-fields"><DetailField label="Detected at" value={localTime(selected.detected_at)} icon={<Clock3 size={15} />} /><DetailField label="Classification" value={selected.animal_class ?? NA} icon={<Leaf size={15} />} /><DetailField label="Confidence" value={confidence(selected.confidence)} icon={<Activity size={15} />} /><DetailField label="Location / zone" value={selected.location_label ?? NA} icon={<MapPin size={15} />} /><DetailField label="Warning status" value={selected.warning_triggered === null ? NA : 'simulation' in selected ? selected.warning_triggered ? 'Warning simulated' : 'No warning simulated' : selected.warning_triggered ? 'Warning triggered' : 'No warning'} icon={<ShieldCheck size={15} />} /><DetailField label="Warning time" value={localTime(selected.warning_triggered_at)} icon={<BellRing size={15} />} /><DetailField label="Review status" value={selected.status ?? NA} icon={<Check size={15} />} /><DetailField label="Crossing risk" value={'simulation' in selected ? `${selected.simulation.risk.toUpperCase()} · simulated` : NA} icon={<AlertTriangle size={15} />} />{'simulation' in selected && <><DetailField label="Distance to road" value={`${selected.simulation.distanceToRoadM} m`} icon={<MapPin size={15} />} /><DetailField label="Movement" value={selected.simulation.movingTowardRoad ? 'Toward the road' : 'Not approaching'} icon={<Activity size={15} />} /></>}</div><div className="detail-notes"><b>Notes</b><p>{selected.notes ?? NA}</p></div></>}<div className="detail-footer"><span><i className={`footer-status ${'simulation' in selected || isDemoMode ? 'is-demo' : ''}`} />{'simulation' in selected ? 'Simulation only · not in database' : isDemoMode ? 'Sample record' : 'Database record'}</span><button className="button button-secondary" onClick={() => setSelected(null)}>Close</button></div></section></div>}
+    {selected && <DetectionDetailModal detection={selected} loading={detailLoading} demoMode={isDemoMode} onClose={() => setSelected(null)} />}
+    {aboutOpen && <div className="modal-scrim" role="presentation" onClick={() => setAboutOpen(false)}><section className="detail-modal about-modal" role="dialog" aria-modal="true" aria-labelledby="about-title" onClick={(event) => event.stopPropagation()}><div className="detail-header"><div><div className="eyebrow"><span className="eyebrow-line" />WILDWATCH</div><h2 id="about-title">About this dashboard</h2><span className="detail-id">Smart Wildlife Crossing Warning System · Team 11</span></div><button className="icon-button" aria-label="Close about this dashboard" onClick={() => setAboutOpen(false)}><X size={18} /></button></div><div className="about-content"><p>WildWatch is a project dashboard concept for reviewing wildlife detections near road crossings and exploring how a warning system could support safer crossings.</p><div><b>Overview</b><span>Shows a product preview with clearly labeled sample activity and a virtual warning state.</span></div><div><b>Detection history</b><span>Search, filter, review, and export sample or shared detection records.</span></div><div><b>AI analysis</b><span>Run NanoDetector on an uploaded image using the local computer’s model service. Predictions show boxes and confidence labels.</span></div><div><b>System status</b><span>Shows Supabase connectivity and preview service information.</span></div><div className="about-demo-note"><CircleHelp size={15} /><span>Sample activity is fictional. Image analysis is on-demand; there is no live camera, continuous AI monitoring, or physical warning-light control.</span></div></div><div className="detail-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo environment' : 'Supabase connected'}</span><button className="button button-secondary" onClick={() => setAboutOpen(false)}>Close</button></div></section></div>}
   </div>;
 }
 
@@ -128,5 +155,19 @@ function DetectionTable({ records, loading, onSelect, compact = false, onHistory
   </tbody></table></div>;
 }
 function DetailField({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) { return <div className="detail-field"><span className="detail-field-icon">{icon}</span><div><span>{label}</span><b className={value === NA ? 'muted' : ''}>{value}</b></div></div>; }
+
+function DetectionDetailModal({ detection, loading, demoMode, onClose }: { detection: Detection | SimulatedDetection; loading: boolean; demoMode: boolean; onClose: () => void }) {
+  const simulated = 'simulation' in detection;
+  const warningStatus = detection.warning_triggered === null ? NA : simulated ? detection.warning_triggered ? 'Warning simulated' : 'No warning simulated' : detection.warning_triggered ? 'Warning triggered' : 'No warning';
+  return <div className="modal-scrim" role="presentation" onClick={onClose}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" onClick={(event) => event.stopPropagation()}>
+    <div className="detail-header"><div><div className="eyebrow"><span className="eyebrow-line" />{simulated ? 'SIMULATED DEMO RECORD' : 'DETECTION RECORD'}</div><h2 id="detail-title">{detection.animal_class ?? NA}</h2><span className="detail-id">{detection.id}</span></div><button className="icon-button" aria-label="Close details" onClick={onClose}><X size={18} /></button></div>
+    {loading ? <div className="detail-loading"><span className="spinner" />Loading record…</div> : <>
+      <div className="detail-image">{detection.image_url ? <img src={detection.image_url} alt="Detection reference" /> : <div><div className="image-placeholder-icon"><Eye size={21} /></div><strong>{simulated ? 'Simulated image placeholder' : 'Image not attached'}</strong><span>Visual reference is not available.</span></div>}<span className="image-tag">{detection.image_url ? 'RECORD IMAGE' : 'NO MEDIA'}</span></div>
+      <div className="detail-fields"><DetailField label="Detected at" value={localTime(detection.detected_at)} icon={<Clock3 size={15} />} /><DetailField label="Classification" value={detection.animal_class ?? NA} icon={<Leaf size={15} />} /><DetailField label="Confidence" value={confidence(detection.confidence)} icon={<Activity size={15} />} /><DetailField label="Location / zone" value={detection.location_label ?? NA} icon={<MapPin size={15} />} /><DetailField label="Warning status" value={warningStatus} icon={<ShieldCheck size={15} />} /><DetailField label="Warning time" value={localTime(detection.warning_triggered_at)} icon={<BellRing size={15} />} /><DetailField label="Review status" value={detection.status ?? NA} icon={<Check size={15} />} />{simulated && <><DetailField label="Crossing risk" value={`${detection.simulation.risk.toUpperCase()} · simulated`} icon={<AlertTriangle size={15} />} /><DetailField label="Distance to road" value={`${detection.simulation.distanceToRoadM} m`} icon={<MapPin size={15} />} /><DetailField label="Movement" value={detection.simulation.movingTowardRoad ? 'Toward the road' : 'Not approaching'} icon={<Activity size={15} />} /></>}</div>
+      <div className="detail-notes"><b>Notes</b><p>{detection.notes ?? NA}</p></div>
+    </>}
+    <div className="detail-footer"><span><i className={`footer-status ${simulated || demoMode ? 'is-demo' : ''}`} />{simulated ? 'Simulation only · not in database' : demoMode ? 'Sample record' : 'Database record'}</span><button className="button button-secondary" onClick={onClose}>Close</button></div>
+  </section></div>;
+}
 
 export default App;

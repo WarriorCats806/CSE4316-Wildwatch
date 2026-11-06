@@ -16,6 +16,8 @@ type Prediction = {
   }>;
 };
 
+const detectionColors = ['#00cbb3', '#263e8b', '#df8f27', '#8a55ad', '#c94e58'];
+
 const serviceUrl = (import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 export default function AIAnalysis() {
@@ -63,7 +65,19 @@ export default function AIAnalysis() {
       <section className="panel ai-upload-panel">
         <div className="analytics-heading"><div><h3>Test image</h3><p>JPEG, PNG, or WebP · up to 15 MB</p></div></div>
         <label className="ai-dropzone">
-          {preview ? <img src={preview} alt="Selected wildlife image preview" /> : <span className="ai-empty-upload"><ImagePlus size={26} /><b>Select a camera-trap image</b><small>The image stays on this computer and is sent only to the local model service.</small></span>}
+          {preview ? <div className="ai-image-preview"><img src={preview} alt="Selected wildlife image preview" />{result && <svg className="ai-image-overlay" viewBox={`0 0 ${result.image_width} ${result.image_height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${result.detections.length} NanoDetector bounding boxes`}>{result.detections.map((detection, index) => {
+            const { x_min: x, y_min: y, x_max, y_max } = detection.bounding_box;
+            const color = detectionColors[index % detectionColors.length];
+            const fontSize = Math.max(12, result.image_width * 0.038);
+            const labelHeight = fontSize * 1.35;
+            const labelWidth = Math.min(result.image_width - x, (detection.animal_class.length + 7) * fontSize * 0.61 + 12);
+            const labelY = Math.max(0, y - labelHeight);
+            return <g key={`${detection.class_id}-${index}`}>
+              <rect x={x} y={y} width={Math.max(0, x_max - x)} height={Math.max(0, y_max - y)} fill="none" stroke={color} strokeWidth={Math.max(2, result.image_width * 0.008)} />
+              <rect x={x} y={labelY} width={labelWidth} height={labelHeight} rx={2} fill={color} />
+              <text x={x + 5} y={labelY + fontSize} fill="#fff" fontSize={fontSize} fontWeight={700} fontFamily="Arial, sans-serif">{detection.animal_class} {detection.confidence.toFixed(2)}</text>
+            </g>;
+          })}</svg>}</div> : <span className="ai-empty-upload"><ImagePlus size={26} /><b>Select a camera-trap image</b><small>The image stays on this computer and is sent only to the local model service.</small></span>}
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setResult(null); setError(''); }} />
         </label>
         <button className="button ai-run-button" onClick={() => void analyze()} disabled={!file || busy || service !== 'ready'}>{busy ? <LoaderCircle size={15} className="ai-spinner" /> : <BrainCircuit size={15} />}{busy ? 'Analyzing image…' : 'Run NanoDetector'}</button>

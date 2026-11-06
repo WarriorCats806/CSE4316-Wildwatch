@@ -22,12 +22,13 @@ create index if not exists detections_warning_triggered_idx
 
 alter table public.detections enable row level security;
 
--- The dashboard is intentionally read-only. Add ingestion through a trusted server
+-- Only signed-in team members can read records. Add ingestion through a trusted server
 -- or Edge Function using a server-side secret; never ship a service-role key to Vite.
 drop policy if exists "Public can read detections" on public.detections;
-create policy "Public can read detections"
+create policy "Authenticated users can read detections"
   on public.detections for select
-  to anon, authenticated
+  to authenticated
   using (true);
 
-grant select on public.detections to anon, authenticated;
+revoke select on public.detections from anon;
+grant select on public.detections to authenticated;
