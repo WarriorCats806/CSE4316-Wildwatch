@@ -25,7 +25,7 @@ npm run preview
 
 ## Run NanoDetector locally
 
-The AI Analysis tab runs the NanoDetector YOLOv5m checkpoint on a test image using the local computer. On Windows with Python 3.12, run the setup script from PowerShell:
+The AI Analysis tab runs the NanoDetector YOLOv5m checkpoint on a test image or short video using the local computer. On Windows with Python 3.12, run the setup script from PowerShell:
 
 ```powershell
 cd ai-service
@@ -33,9 +33,9 @@ cd ai-service
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-In a second terminal at the repository root, run `npm run dev`, open **AI analysis**, choose a JPEG, PNG, or WebP camera-trap image, then select **Run NanoDetector**. The setup script installs CUDA-enabled PyTorch 2.5.1 for local NVIDIA inference and the Python API dependencies. The first prediction downloads the approximately 169 MB weights file and pinned YOLOv5 code; later predictions reuse the local caches. Inference falls back to CPU if CUDA is unavailable. The confidence threshold defaults to the model publisher's 0.75 field setting and can be changed with `WILDLIFE_CONFIDENCE_THRESHOLD`.
+In a second terminal at the repository root, run `npm run dev`, open **AI analysis**, and upload a JPEG, PNG, WebP, MP4, MOV, AVI, MKV, or WebM file. Videos must be at most 30 seconds and 100 MB; NanoDetector samples up to 30 frames (about one per second). The dashboard overlays detections at their sampled timestamps while the video plays. MP4 with H.264 is recommended for broad codec support. The setup script installs CUDA-enabled PyTorch 2.5.1 for local NVIDIA inference and the Python API dependencies. The first prediction downloads the approximately 169 MB weights file and pinned YOLOv5 code; later predictions reuse the local caches. Inference falls back to CPU if CUDA is unavailable. The confidence threshold defaults to the model publisher's 0.75 field setting and can be changed with `WILDLIFE_CONFIDENCE_THRESHOLD`.
 
-This local test displays the predicted species, confidence, bounding boxes, device, and inference time. It does not save the uploaded image or predictions to Supabase. Configure `VITE_AI_SERVICE_URL` if the local inference service runs at a different URL. The adapter is selected by `WILDLIFE_MODEL=nanodetector`, allowing another model adapter to be added later without changing the dashboard response format.
+This local test displays the predicted species, confidence, bounding boxes, device, and inference time or sampled video frames. It does not save uploaded media or predictions to Supabase. Configure `VITE_AI_SERVICE_URL` if the local inference service runs at a different URL. The adapter is selected by `WILDLIFE_MODEL=nanodetector`, allowing another model adapter to be added later without changing the dashboard response format.
 
 ## Interactive demo features
 

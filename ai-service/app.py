@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import os
+import math
+import tempfile
 import time
 from functools import lru_cache
 from io import BytesIO
+from pathlib import Path
 from typing import Protocol
 
+import cv2
 import torch
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +18,10 @@ from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
+MAX_VIDEO_BYTES = 100 * 1024 * 1024
+MAX_VIDEO_SECONDS = 30
+MAX_VIDEO_FRAMES = 30
+VIDEO_SUFFIXES = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 NANODETECTOR_REPO = "sheneman/NanoDetector"
 NANODETECTOR_WEIGHTS = "NanoDetector_YOLOv5m_v1.pt"
 # PyTorch Hub accepts Git refs (branches/tags), not arbitrary commit hashes.
@@ -86,6 +94,58 @@ def get_detector() -> Detector:
     raise RuntimeError(f"Unknown wildlife model '{selected_model}'. Available models: nanodetector")
 
 
+def analyze_video_file(path: str) -> dict:
+    capture = cv2.VideoCapture(path)
+    try:
+        if not capture.isOpened():
+            raise ValueError("The video could not be opened. Try an MP4 encoded with H.264.")
+
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if not math.isfinite(fps) or fps <= 0 or frame_count <= 0 or width <= 0 or height <= 0:
+            raise ValueError("The uploaded video has invalid frame metadata.")
+
+        duration = frame_count / fps
+        if duration > MAX_VIDEO_SECONDS:
+            raise ValueError(f"Videos must be {MAX_VIDEO_SECONDS} seconds or shorter.")
+
+        sample_count = min(MAX_VIDEO_FRAMES, max(1, math.ceil(duration)))
+        sample_interval = duration / sample_count
+        detector = get_detector()
+        frames = []
+        for sample_index in range(sample_count):
+            timestamp = sample_index * sample_interval
+            capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
+            read_ok, frame = capture.read()
+            if not read_ok or frame is None:
+                continue
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            prediction = detector.predict(Image.fromarray(rgb))
+            frames.append({
+                "time_seconds": round(timestamp, 2),
+                "inference_ms": prediction["inference_ms"],
+                "detections": prediction["detections"],
+            })
+
+        if not frames:
+            raise ValueError("No readable frames were found in the uploaded video.")
+        return {
+            "model_name": detector.model_name,
+            "device": detector.device,
+            "video_width": width,
+            "video_height": height,
+            "video_duration_seconds": round(duration, 2),
+            "processed_frames": len(frames),
+            "sampling_interval_seconds": round(sample_interval, 2),
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "frames": frames,
+        }
+    finally:
+        capture.release()
+
+
 app = FastAPI(title="WildWatch local inference", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -124,3 +184,27 @@ async def predict(file: UploadFile = File(...)) -> dict:
         return await run_in_threadpool(detector.predict, image)
     except Exception as error:
         raise HTTPException(status_code=503, detail=f"NanoDetector could not run: {error}") from error
+
+
+@app.post("/predict-video")
+async def predict_video(file: UploadFile = File(...)) -> dict:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in VIDEO_SUFFIXES or not (file.content_type or "").startswith("video/"):
+        raise HTTPException(status_code=415, detail="Upload an MP4, MOV, AVI, MKV, or WebM video.")
+    contents = await file.read(MAX_VIDEO_BYTES + 1)
+    if len(contents) > MAX_VIDEO_BYTES:
+        raise HTTPException(status_code=413, detail="Video must be 100 MB or smaller.")
+
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary_file:
+            temporary_path = temporary_file.name
+            temporary_file.write(contents)
+        return await run_in_threadpool(analyze_video_file, temporary_path)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=f"NanoDetector could not analyze this video: {error}") from error
+    finally:
+        if temporary_path and os.path.exists(temporary_path):
+            os.unlink(temporary_path)
