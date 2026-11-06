@@ -5,3 +5,8 @@ dist/
 .vercel
 .tmp/
 npm-debug.log*
+
+ai-service/.venv/
+ai-service/__pycache__/
+ai-service/.env
+ai-service/.tmp/

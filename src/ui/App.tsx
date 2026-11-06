@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, BellRing, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Compass, Database, Download, Eye, Filter, Leaf, ListFilter, MapPin, Menu, MoreHorizontal, Search, ShieldCheck, SlidersHorizontal, X, RefreshCw } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, BellRing, BrainCircuit, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Compass, Database, Download, Eye, Filter, Leaf, ListFilter, MapPin, Menu, MoreHorizontal, Search, ShieldCheck, SlidersHorizontal, X, RefreshCw } from 'lucide-react';
 import { DATA_MODE_LABEL, isDemoMode, loadAllDetections, loadDetection, loadDetections, loadSummary } from '../backend';
 import { downloadDetectionsCsv } from '../export';
 import DemoFeatures from './DemoFeatures';
 import SystemStatus from './SystemStatus';
+import AIAnalysis from './AIAnalysis';
 import type { SimulatedDetection } from '../simulator';
 import { EMPTY_FILTERS, type Detection, type DetectionFilters } from '../types';
 
-type View = 'overview' | 'history' | 'status';
+type View = 'overview' | 'history' | 'status' | 'ai';
 const PAGE_SIZE = 7;
 const NA = 'Not available';
 const localTime = (date: string | null) => date ? new Date(date).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : NA;
@@ -69,6 +70,7 @@ function App() {
       <div className="nav-label">WORKSPACE</div>
       <button className={`nav-item ${view === 'overview' ? 'active' : ''}`} onClick={() => { setView('overview'); setMobileNav(false); }}><Activity size={17} />Overview</button>
       <button className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => { setView('history'); setMobileNav(false); }}><Clock3 size={17} />Detection history</button>
+      <button className={`nav-item ${view === 'ai' ? 'active' : ''}`} onClick={() => { setView('ai'); setMobileNav(false); }}><BrainCircuit size={17} />AI analysis</button>
       <button className={`nav-item ${view === 'status' ? 'active' : ''}`} onClick={() => { setView('status'); setMobileNav(false); }}><Database size={17} />System status</button>
       <div className="sidebar-divider" />
       <div className="nav-label">SYSTEM</div>
@@ -77,7 +79,7 @@ function App() {
     </aside>
     {mobileNav && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <main className="main-area">
-      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : view === 'history' ? 'Detection history' : 'System status'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span><div className="top-avatar">FT</div></div></header>
+      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{view === 'overview' ? 'Overview' : view === 'history' ? 'Detection history' : view === 'ai' ? 'AI analysis' : 'System status'}</b></div><div className="top-actions"><span className={`mode-pill ${isDemoMode ? 'mode-demo' : 'mode-live'}`}><i />{DATA_MODE_LABEL}</span><span className="top-divider" /><span className="top-date"><CalendarDays size={15} />{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span><div className="top-avatar">FT</div></div></header>
       <div className="content">
         {view === 'overview' ? <>
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />WILDLIFE CROSSING MONITOR</div><h1>Good afternoon, team <span>✳</span></h1><p>A clear look at activity around your monitored crossings.</p></div><button className="button button-secondary" onClick={() => { setView('history'); setFilters(EMPTY_FILTERS); }}><ListFilter size={16} />View all detections<ArrowRight size={15} /></button></div>
@@ -102,12 +104,12 @@ function App() {
             <div className="pagination"><span>Showing <b>{total ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, total)}</b> of <b>{total}</b> records</span><div><button aria-label="Previous page" disabled={page <= 1 || loading} onClick={() => setPage((n) => Math.max(1, n - 1))}><ArrowLeft size={15} /></button><span>Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span><button aria-label="Next page" disabled={page * PAGE_SIZE >= total || loading} onClick={() => setPage((n) => n + 1)}><ArrowRight size={15} /></button></div></div>
           </section>
           <footer className="page-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo mode · no live camera connection' : 'Connected to your Supabase database'}</span><span>WildWatch <i>·</i> Crossing safety dashboard</span></footer>
-        </> : <>
+        </> : view === 'status' ? <>
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />SYSTEM</div><h1>System status</h1><p>Review database connectivity and the current preview pipeline state.</p></div><button className="button button-secondary" onClick={() => void refresh()}><RefreshCw size={15} />Refresh status</button></div>
           {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
           <SystemStatus databaseLoading={loading} databaseError={Boolean(error)} demoMode={isDemoMode} lastRefresh={lastRefresh} />
           <footer className="page-footer"><span><i className={`footer-status ${isDemoMode ? 'is-demo' : ''}`} />{isDemoMode ? 'Demo mode · camera and AI are preview only' : 'Supabase connection status'}</span><span>WildWatch <i>·</i> System status</span></footer>
-        </>}
+        </> : <AIAnalysis />}
       </div>
     </main>
     {selected && <div className="modal-scrim" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" onClick={(e) => e.stopPropagation()}><div className="detail-header"><div><div className="eyebrow"><span className="eyebrow-line" />{'simulation' in selected ? 'SIMULATED DEMO RECORD' : 'DETECTION RECORD'}</div><h2 id="detail-title">{selected.animal_class ?? NA}</h2><span className="detail-id">{selected.id}</span></div><button className="icon-button" aria-label="Close details" onClick={() => setSelected(null)}><X size={18} /></button></div>{detailLoading ? <div className="detail-loading"><span className="spinner" />Loading record…</div> : <><div className="detail-image">{selected.image_url ? <img src={selected.image_url} alt="Detection reference" /> : <div><div className="image-placeholder-icon"><Eye size={21} /></div><strong>{'simulation' in selected ? 'Simulated image placeholder' : 'Image not attached'}</strong><span>Visual reference for this record is {NA.toLowerCase()}.</span></div>}<span className="image-tag">{selected.image_url ? 'RECORD IMAGE' : 'NO MEDIA'}</span></div><div className="detail-fields"><DetailField label="Detected at" value={localTime(selected.detected_at)} icon={<Clock3 size={15} />} /><DetailField label="Classification" value={selected.animal_class ?? NA} icon={<Leaf size={15} />} /><DetailField label="Confidence" value={confidence(selected.confidence)} icon={<Activity size={15} />} /><DetailField label="Location / zone" value={selected.location_label ?? NA} icon={<MapPin size={15} />} /><DetailField label="Warning status" value={selected.warning_triggered === null ? NA : 'simulation' in selected ? selected.warning_triggered ? 'Warning simulated' : 'No warning simulated' : selected.warning_triggered ? 'Warning triggered' : 'No warning'} icon={<ShieldCheck size={15} />} /><DetailField label="Warning time" value={localTime(selected.warning_triggered_at)} icon={<BellRing size={15} />} /><DetailField label="Review status" value={selected.status ?? NA} icon={<Check size={15} />} /><DetailField label="Crossing risk" value={'simulation' in selected ? `${selected.simulation.risk.toUpperCase()} · simulated` : NA} icon={<AlertTriangle size={15} />} />{'simulation' in selected && <><DetailField label="Distance to road" value={`${selected.simulation.distanceToRoadM} m`} icon={<MapPin size={15} />} /><DetailField label="Movement" value={selected.simulation.movingTowardRoad ? 'Toward the road' : 'Not approaching'} icon={<Activity size={15} />} /></>}</div><div className="detail-notes"><b>Notes</b><p>{selected.notes ?? NA}</p></div></>}<div className="detail-footer"><span><i className={`footer-status ${'simulation' in selected || isDemoMode ? 'is-demo' : ''}`} />{'simulation' in selected ? 'Simulation only · not in database' : isDemoMode ? 'Sample record' : 'Database record'}</span><button className="button button-secondary" onClick={() => setSelected(null)}>Close</button></div></section></div>}
