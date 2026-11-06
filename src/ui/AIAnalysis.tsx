@@ -33,6 +33,12 @@ type VideoPrediction = {
 type Prediction = ImagePrediction | VideoPrediction;
 const detectionColors = ['#00cbb3', '#263e8b', '#df8f27', '#8a55ad', '#c94e58'];
 const serviceUrl = (import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+// HTTPS pages need to explicitly identify localhost as the request's target
+// address space in browsers that enforce Local Network Access permissions.
+const localServiceRequest = (init: RequestInit = {}): RequestInit => ({
+  ...init,
+  targetAddressSpace: 'loopback',
+} as RequestInit);
 const videoExtensions = /\.(mp4|mov|avi|mkv|webm)$/i;
 const isVideoFile = (file: File | null) => Boolean(file && (file.type.startsWith('video/') || videoExtensions.test(file.name)));
 const isVideoResult = (result: Prediction | null): result is VideoPrediction => Boolean(result && 'frames' in result);
@@ -49,7 +55,7 @@ export default function AIAnalysis() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    fetch(`${serviceUrl}/health`).then((response) => {
+    fetch(`${serviceUrl}/health`, localServiceRequest()).then((response) => {
       if (!response.ok) throw new Error('Service unavailable');
       return response.json();
     }).then(() => setService('ready')).catch(() => setService('offline'));
@@ -78,7 +84,7 @@ export default function AIAnalysis() {
     body.append('file', file);
     try {
       const endpoint = videoFile ? 'predict-video' : 'predict';
-      const response = await fetch(`${serviceUrl}/${endpoint}`, { method: 'POST', body });
+      const response = await fetch(`${serviceUrl}/${endpoint}`, localServiceRequest({ method: 'POST', body }));
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || `NanoDetector could not analyze this ${videoFile ? 'video' : 'image'}.`);
       setResult(payload as Prediction);
@@ -90,6 +96,7 @@ export default function AIAnalysis() {
   return <section className="ai-analysis-page">
     <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />LOCAL MODEL INFERENCE</div><h1>NanoDetector image &amp; video analysis</h1><p>Upload a camera-trap image or short video to analyze it on this computer.</p></div><span className={`ai-service-pill ai-service-${service}`}><i />{service === 'ready' ? 'LOCAL SERVICE READY' : service === 'checking' ? 'CHECKING SERVICE' : 'LOCAL SERVICE OFFLINE'}</span></div>
     <div className="ai-disclaimer"><BrainCircuit size={17} /><span><b>On-demand model analysis.</b> Uploaded media stays local and is not saved to Supabase or used to control hardware.</span><span className="sim-mini-tag">NANODETECTOR</span></div>
+    {service === 'offline' && <div className="ai-offline-hint" role="status"><b>Start the local service on this computer.</b><span>Keep the Python service running, allow this site to access your local network if your browser asks, and set <code>WILDLIFE_ALLOWED_ORIGINS</code> to this site’s exact HTTPS origin.</span></div>}
     {error && <div className="error-banner" role="alert"><AlertTriangle size={17} /><span>{error}</span></div>}
     <div className="ai-workspace">
       <section className="panel ai-upload-panel">

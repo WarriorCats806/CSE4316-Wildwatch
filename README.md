@@ -37,6 +37,18 @@ In a second terminal at the repository root, run `npm run dev`, open **AI analys
 
 This local test displays the predicted species, confidence, bounding boxes, device, and inference time or sampled video frames. It does not save uploaded media or predictions to Supabase. Configure `VITE_AI_SERVICE_URL` if the local inference service runs at a different URL. The adapter is selected by `WILDLIFE_MODEL=nanodetector`, allowing another model adapter to be added later without changing the dashboard response format.
 
+### Use the hosted dashboard with a local service
+
+The hosted HTTPS dashboard sends requests to `http://127.0.0.1:8000` on the computer viewing the page. Each user must install the Python service, start it, and keep its terminal open. In PowerShell, from the repository root, run:
+
+```powershell
+cd ai-service
+$env:WILDLIFE_ALLOWED_ORIGINS = "https://your-branch.your-app-id.amplifyapp.com"
+.\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Replace the example origin with the exact HTTPS origin in the browser address bar (scheme and hostname only; no path or trailing slash). If dependencies are not installed yet, run `cd ai-service; .\setup.ps1` once first. Check that `http://127.0.0.1:8000/health` returns a healthy response, then refresh the hosted AI Analysis page. Allow the browser's local-network access prompt if it appears. The app requests loopback access explicitly for browsers that require it.
+
 ## Interactive demo features
 
 The Overview page is a static product preview with fictional wildlife examples. The high-risk indicator and virtual warning state represent the sample camera's 7:30 PM deer detection. System status is available in its own sidebar tab. There is no interactive wildlife simulator in this version. The preview does not control a real warning light or connect to a camera. Use the separate AI Analysis tab to run NanoDetector against a local image.
