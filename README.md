@@ -1,6 +1,6 @@
 # WildWatch Dashboard
 
-A shared wildlife crossing dashboard for the Team 11 project. The frontend is a React and TypeScript app, demo data is local and fictional, and authenticated team members can read shared records from Supabase. An optional local Python service runs NanoDetector on uploaded test images. There is no live camera driver, warning-light control, or continuous monitoring.
+A shared wildlife crossing dashboard for the Team 11 project. The frontend is a React and TypeScript app, demo data is local and fictional, and authenticated team members can read shared records from Supabase. An optional local Python service runs NanoDetector on uploaded test media or a still frame captured from the browser camera. The app does not control warning lights or run continuous monitoring.
 
 ## Quick start
 
@@ -37,6 +37,10 @@ In a second terminal at the repository root, run `npm run dev`, open **AI analys
 
 This local test displays the predicted species, confidence, bounding boxes, device, and inference time or sampled video frames. It does not save uploaded media or predictions to Supabase. Configure `VITE_AI_SERVICE_URL` if the local inference service runs at a different URL. The adapter is selected by `WILDLIFE_MODEL=nanodetector`, allowing another model adapter to be added later without changing the dashboard response format.
 
+### Use a Raspberry Pi camera
+
+Open the HTTPS dashboard in a current browser on the Raspberry Pi and sign in. In **AI analysis**, choose **Open live camera** and grant camera permission. The browser must be able to see the attached camera through its camera API; if the preview does not start, check the Pi camera is enabled and appears as a camera device to the browser. Choose **Capture frame** to select a still image, then run NanoDetector to analyze it. Camera preview and capture happen in the browser; analysis still requires the local AI service to be running and reachable at `127.0.0.1:8000` on that Pi. This is a live preview with manual still capture, not continuous detection or recording.
+
 ### Use the hosted dashboard with a local service
 
 The hosted HTTPS dashboard sends requests to `http://127.0.0.1:8000` on the computer viewing the page. Each user must install the Python service, start it, and keep its terminal open. In PowerShell, from the repository root, run:
@@ -51,13 +55,13 @@ Replace the example origin with the exact HTTPS origin in the browser address ba
 
 ## Interactive demo features
 
-The Overview page is a static product preview with fictional wildlife examples. The high-risk indicator and virtual warning state represent the sample camera's 7:30 PM deer detection. System status is available in its own sidebar tab. There is no interactive wildlife simulator in this version. The preview does not control a real warning light or connect to a camera. Use the separate AI Analysis tab to run NanoDetector against a local image.
+The Overview page is a static product preview with fictional wildlife examples. The high-risk indicator and virtual warning state represent the sample camera's 7:30 PM deer detection. System status is available in its own sidebar tab. There is no interactive wildlife simulator in this version. The overview preview does not control a real warning light or display the connected camera; use **AI analysis** for the browser camera preview and still capture.
 
 The camera preview is a static presentation mock showing three fictional animals at 7:30 PM with example confidence and risk labels. It is not a live camera feed or GPS display. Dashboard analytics use the selected sample or Supabase records.
 
 The recent detections table and detection history remain available for reviewing records. The camera snapshot examples are illustrative and are not stored in Supabase.
 
-The System status tab reports the configured database connection, local image-analysis path, and last successful data refresh. It does not indicate a live camera connection. In demo mode, the database status explicitly says it is displaying demo records.
+The System status tab reports the configured database connection, local image-analysis path, and last successful data refresh. Browser camera access is available in AI Analysis when the device and browser support it. In demo mode, the database status explicitly says it is displaying demo records.
 
 In Detection history, **Export CSV** downloads every record matching the current search and filters (not only the visible page). In database mode, matching records are loaded from Supabase in pages before export. Demo records can also be exported.
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BrainCircuit, CheckCircle2, ImagePlus, LoaderCircle, Upload } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, Camera, CheckCircle2, ImagePlus, LoaderCircle, StopCircle, Upload } from 'lucide-react';
 
 type Detection = {
   animal_class: string;
@@ -53,6 +53,20 @@ export default function AIAnalysis() {
   const [service, setService] = useState<'checking' | 'ready' | 'offline'>('checking');
   const [videoTime, setVideoTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraPreviewRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState('');
+
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  useEffect(() => {
+    if (!cameraPreviewRef.current || !cameraStream) return;
+    cameraPreviewRef.current.srcObject = cameraStream;
+    void cameraPreviewRef.current.play().catch(() => setCameraError('The camera opened, but the browser could not start its preview.'));
+  }, [cameraStream]);
 
   useEffect(() => {
     fetch(`${serviceUrl}/health`, localServiceRequest()).then((response) => {
@@ -77,6 +91,57 @@ export default function AIAnalysis() {
     ? videoResult.frames.flatMap((frame) => frame.detections.map((detection) => ({ detection, time: frame.time_seconds })))
     : imageResult?.detections.map((detection) => ({ detection, time: undefined })) ?? [];
 
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraStream(null);
+  };
+
+  const startCamera = async () => {
+    setCameraError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('This browser cannot access a camera. Open WildWatch in a current browser over HTTPS on the Raspberry Pi.');
+      return;
+    }
+    stopCamera();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      cameraStreamRef.current = stream;
+      setCameraStream(stream);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Camera access was denied.';
+      setCameraError(`${message} Check the browser camera permission and that the Raspberry Pi camera is enabled.`);
+    }
+  };
+
+  const captureFrame = () => {
+    const video = cameraPreviewRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError('The camera is still starting. Wait for the preview, then capture again.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setCameraError('Could not capture a frame from this camera.');
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) { setCameraError('Could not encode the camera frame.'); return; }
+      setFile(new File([blob], `wildwatch-camera-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      setVideoTime(0);
+      setResult(null);
+      setError('');
+      setCameraError('Frame captured. Run NanoDetector below to analyze it.');
+    }, 'image/jpeg', 0.92);
+  };
+
   const analyze = async () => {
     if (!file) return;
     setBusy(true); setError(''); setResult(null);
@@ -94,10 +159,21 @@ export default function AIAnalysis() {
   };
 
   return <section className="ai-analysis-page">
-    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />LOCAL MODEL INFERENCE</div><h1>NanoDetector image &amp; video analysis</h1><p>Upload a camera-trap image or short video to analyze it on this computer.</p></div><span className={`ai-service-pill ai-service-${service}`}><i />{service === 'ready' ? 'LOCAL SERVICE READY' : service === 'checking' ? 'CHECKING SERVICE' : 'LOCAL SERVICE OFFLINE'}</span></div>
+    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />LOCAL MODEL INFERENCE</div><h1>NanoDetector image &amp; video analysis</h1><p>Upload a camera-trap image or short video to analyze it on this device.</p></div><span className={`ai-service-pill ai-service-${service}`}><i />{service === 'ready' ? 'LOCAL SERVICE READY' : service === 'checking' ? 'CHECKING SERVICE' : 'LOCAL SERVICE OFFLINE'}</span></div>
     <div className="ai-disclaimer"><BrainCircuit size={17} /><span><b>On-demand model analysis.</b> Uploaded media stays local and is not saved to Supabase or used to control hardware.</span><span className="sim-mini-tag">NANODETECTOR</span></div>
-    {service === 'offline' && <div className="ai-offline-hint" role="status"><b>Start the local service on this computer.</b><span>Keep the Python service running, allow this site to access your local network if your browser asks, and set <code>WILDLIFE_ALLOWED_ORIGINS</code> to this site’s exact HTTPS origin.</span></div>}
+    {service === 'offline' && <div className="ai-offline-hint" role="status"><b>Start the local service on this device.</b><span>Keep the Python service running, allow this site to access your local network if your browser asks, and set <code>WILDLIFE_ALLOWED_ORIGINS</code> to this site’s exact HTTPS origin.</span></div>}
     {error && <div className="error-banner" role="alert"><AlertTriangle size={17} /><span>{error}</span></div>}
+    <section className="panel ai-camera-panel">
+      <div className="analytics-heading"><div><h3>Raspberry Pi camera</h3><p>Open the camera connected to this device, then capture a frame for analysis.</p></div><span className={`ai-camera-pill ${cameraStream ? 'is-live' : ''}`}><i />{cameraStream ? 'LIVE PREVIEW' : 'CAMERA CLOSED'}</span></div>
+      {cameraError && <p className="ai-camera-message" role="status">{cameraError}</p>}
+      {cameraStream && <div className="ai-camera-preview"><video ref={cameraPreviewRef} autoPlay muted playsInline aria-label="Live Raspberry Pi camera preview" /></div>}
+      <div className="ai-camera-actions">
+        {!cameraStream ? <button className="button button-secondary" onClick={() => void startCamera()}><Camera size={15} />Open live camera</button> : <>
+          <button className="button button-secondary" onClick={captureFrame}><Camera size={15} />Capture frame</button>
+          <button className="button button-secondary" onClick={stopCamera}><StopCircle size={15} />Stop camera</button>
+        </>}
+      </div>
+    </section>
     <div className="ai-workspace">
       <section className="panel ai-upload-panel">
         <div className="analytics-heading"><div><h3>Test media</h3><p>Image ≤15 MB · Video ≤30 seconds and 100 MB</p></div></div>
