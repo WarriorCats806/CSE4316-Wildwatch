@@ -54,6 +54,8 @@ uv pip install --python .venv312/bin/python torch==2.5.1 torchvision==0.20.1
 uv pip install --python .venv312/bin/python -r requirements.txt
 ```
 
+The requirements pin `setuptools<82` because the YOLOv5 v7.0 model loader still imports `pkg_resources`, which setuptools removed in version 82. If you already created `.venv312`, update it with `uv pip install --python .venv312/bin/python -r requirements.txt` before restarting the service.
+
 Start the local API from the `ai-service` folder. Use the exact HTTPS origin of the dashboard you open on the Pi:
 
 ```bash
