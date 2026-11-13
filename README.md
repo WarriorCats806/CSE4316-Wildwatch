@@ -39,25 +39,26 @@ This local test displays the predicted species, confidence, bounding boxes, devi
 
 ### Use a Raspberry Pi camera
 
-To run NanoDetector on the Pi itself, use 64-bit Raspberry Pi OS and Python 3.11 or 3.12. Check that `uname -m` prints `aarch64` and `python3 --version` reports 3.11 or 3.12. Install the system prerequisites, clone the project, and set up the Python environment:
+To run NanoDetector on the Pi itself, use 64-bit Raspberry Pi OS. Check that `uname -m` prints `aarch64`. The steps below install a project-managed Python 3.12 without replacing Raspberry Pi OS's system Python. Install the system prerequisites, clone the project, and set up the Python environment:
 
 ```bash
 sudo apt update
-sudo apt install -y git python3-venv python3-pip
+sudo apt install -y git curl ca-certificates
 git clone https://github.com/WarriorCats806/CSE4316-Wildwatch.git
 cd CSE4316-Wildwatch/ai-service
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install torch==2.5.1 torchvision==0.20.1
-python -m pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv python install 3.12
+uv venv --python 3.12 .venv312
+uv pip install --python .venv312/bin/python torch==2.5.1 torchvision==0.20.1
+uv pip install --python .venv312/bin/python -r requirements.txt
 ```
 
 Start the local API from the `ai-service` folder. Use the exact HTTPS origin of the dashboard you open on the Pi:
 
 ```bash
 export WILDLIFE_ALLOWED_ORIGINS="https://main.d1wl0p3x5eowy5.amplifyapp.com"
-python -m uvicorn app:app --host 127.0.0.1 --port 8000
+.venv312/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
 Keep this terminal open. Open the hosted dashboard in a current browser on the same Pi and sign in. In **AI analysis**, choose **Open live camera** and grant camera permission. Choose **Capture frame**, then run NanoDetector to analyze the still image. The browser must expose the attached camera; if the preview does not start, check that the camera is enabled and appears to the browser. The first prediction downloads the model weights and pinned YOLOv5 source; CPU inference on a Pi can be slow. The dashboard preview is live, but inference is on-demand and does not continuously analyze or record video.
